@@ -4,10 +4,10 @@ class Request:
         # TODO: parse the bytes of the request and populate the following instance variables
 
         self.body = b""
-        self.method = ""
-        self.path = ""
-        self.http_version = ""
-        self.headers = {}
+        self.method = "GET"
+        self.path = "/"
+        self.http_version = "HTTP/1.1"
+        self.headers = {"Host":"localhost:8080"}
         self.cookies = {}
 
 
