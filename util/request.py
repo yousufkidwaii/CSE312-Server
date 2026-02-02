@@ -3,12 +3,39 @@ class Request:
     def __init__(self, request: bytes):
         # TODO: parse the bytes of the request and populate the following instance variables
 
-        self.body = b""
-        self.method = "GET"
-        self.path = "/"
-        self.http_version = "HTTP/1.1"
-        self.headers = {"Host":"localhost:8080"}
+        header_bytes, sep, body = request.partition(b'\r\n\r\n')
+        if not sep:
+            raise ValueError("Missing CRLF CRLF")
+        self.body = body
+
+        header_text = header_bytes.decode()
+        lines = header_text.split('\r\n')
+
+        request_line = lines[0]
+        parts = request_line.split(' ')
+        if len(parts) != 3:
+            raise ValueError("Invalid request line")
+
+        self.method = parts[0]
+        self.path = parts[1]
+        self.http_version = parts[2]
+
+        self.headers = {}
+        for line in lines[1:]:
+            if not line:
+                continue
+            key,value = line.split(':', 1)
+            self.headers[key] = value.strip()
+
         self.cookies = {}
+        if "Cookie" in self.headers:
+            cookie_header = self.headers["Cookie"]
+            for pair in cookie_header.split(';'):
+                pair = pair.strip()
+                if "=" in pair:
+                    k, v = pair.split("=", 1)
+                    self.cookies[k] = v
+
 
 
 def test1():
