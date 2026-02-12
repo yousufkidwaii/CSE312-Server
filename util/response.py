@@ -47,6 +47,8 @@ class Response:
         return self
 
     def to_data(self):
+        self.header_store["X-Content-Type-Options"] = "nosniff"
+
         if "Content-Type" not in self.header_store:
             self.header_store["Content-Type"] = "text/plain; charset=utf-8"
         self.header_store["Content-Length"] = str(len(self.body_store))

@@ -27,7 +27,7 @@ class Request:
             raise ValueError("Invalid request line")
 
         self.method = parts[0]
-        self.path = parts[1]
+        self.path = parts[1].split("?", 1)[0]
         self.http_version = parts[2]
 
         # Headers
