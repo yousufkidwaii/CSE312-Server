@@ -23,6 +23,7 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
         print("--- received data ---")
         print(received_data)
         print("--- end of data ---\n\n")
+
         request = Request(received_data)
 
         self.router.route_request(request, self)

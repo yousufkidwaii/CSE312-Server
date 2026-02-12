@@ -1,37 +1,52 @@
 class Request:
 
     def __init__(self, request: bytes):
-        # TODO: parse the bytes of the request and populate the following instance variables
+        self.body = b""
+        self.method = ""
+        self.path = ""
+        self.http_version = ""
+        self.headers = {}
+        self.cookies = {}
 
-        header_bytes, sep, body = request.partition(b'\r\n\r\n')
-        if not sep:
-            raise ValueError("Missing CRLF CRLF")
-        self.body = body
+        # Try to split headers/body; if separator missing, treat everything as headers (best-effort)
+        header_bytes, sep, body = request.partition(b"\r\n\r\n")
+        if sep:
+            self.body = body
+        else:
+            header_bytes = request
+            self.body = b""
 
-        header_text = header_bytes.decode()
-        lines = header_text.split('\r\n')
+        # Decode headers safely
+        header_text = header_bytes.decode("utf-8", errors="replace")
+        lines = header_text.split("\r\n")
+
+        # Need at least the request line
+        if len(lines) == 0 or lines[0].strip() == "":
+            raise ValueError("Invalid request line")
 
         request_line = lines[0]
-        parts = request_line.split(' ')
+        parts = request_line.split(" ")
         if len(parts) != 3:
             raise ValueError("Invalid request line")
 
         self.method = parts[0]
         self.path = parts[1]
-        #self.path = raw_path.split("?", 1)[0]
         self.http_version = parts[2]
 
-        self.headers = {}
+        # Headers
         for line in lines[1:]:
             if not line:
                 continue
-            key,value = line.split(':', 1)
+            if ":" not in line:
+                # Ignore malformed/incomplete header lines instead of crashing
+                continue
+            key, value = line.split(":", 1)
             self.headers[key] = value.strip()
 
-        self.cookies = {}
+        # Cookies
         if "Cookie" in self.headers:
             cookie_header = self.headers["Cookie"]
-            for pair in cookie_header.split(';'):
+            for pair in cookie_header.split(";"):
                 pair = pair.strip()
                 if "=" in pair:
                     k, v = pair.split("=", 1)
