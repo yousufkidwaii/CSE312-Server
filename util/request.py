@@ -18,6 +18,7 @@ class Request:
 
         self.method = parts[0]
         self.path = parts[1]
+        #self.path = raw_path.split("?", 1)[0]
         self.http_version = parts[2]
 
         self.headers = {}
