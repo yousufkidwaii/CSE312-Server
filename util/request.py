@@ -8,7 +8,6 @@ class Request:
         self.headers = {}
         self.cookies = {}
 
-        # Try to split headers/body; if separator missing, treat everything as headers (best-effort)
         header_bytes, sep, body = request.partition(b"\r\n\r\n")
         if sep:
             self.body = body
@@ -16,11 +15,9 @@ class Request:
             header_bytes = request
             self.body = b""
 
-        # Decode headers safely
         header_text = header_bytes.decode("utf-8", errors="replace")
         lines = header_text.split("\r\n")
 
-        # Need at least the request line
         if len(lines) == 0 or lines[0].strip() == "":
             raise ValueError("Invalid request line")
 
@@ -38,7 +35,6 @@ class Request:
             if not line:
                 continue
             if ":" not in line:
-                # Ignore malformed/incomplete header lines instead of crashing
                 continue
             key, value = line.split(":", 1)
             self.headers[key] = value.strip()

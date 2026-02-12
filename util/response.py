@@ -59,7 +59,7 @@ class Response:
             response_lines.append(f"{k}: {self.header_store[k]}")
 
         for k in self.cookie_store:
-            response_lines.append(f"Set-Cookie: {k}= {self.cookie_store[k]}")
+            response_lines.append(f"Set-Cookie: {k}={self.cookie_store[k]}")
 
         response_lines.append("")
         header_bytes = "\r\n".join(response_lines).encode("utf-8")

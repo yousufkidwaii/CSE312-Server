@@ -3,6 +3,8 @@ from util.request import Request
 from util.router import Router
 from util.hello_path import hello_path
 from util.static_paths import serve_public, render_page
+from util.chat_api import create_chat, get_chats, update_chat, delete_chat
+
 
 
 class MyTCPHandler(socketserver.BaseRequestHandler):
@@ -15,6 +17,11 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
         self.router.add_route("GET", "/chat", render_page("chat.html"), True)
         #static files
         self.router.add_route("GET", "/public", serve_public, False)
+        #chat api
+        self.router.add_route("POST", "/api/chats", create_chat, True)
+        self.router.add_route("GET", "/api/chats", get_chats, True)
+        self.router.add_route("PATCH", "/api/chats/", update_chat, False)
+        self.router.add_route("DELETE", "/api/chats/", delete_chat, False)
         super().__init__(request, client_address, server)
 
     def handle(self):

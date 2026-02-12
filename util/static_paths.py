@@ -22,9 +22,9 @@ def _safe_public_path(url_path: str) -> Optional[Path]:
     if not url_path.startswith("/public"):
         return None
 
-    rel = url_path[len("/public"):]  # e.g. "/imgs/dog.jpg" or "" or "/"
+    rel = url_path[len("/public"):]
     if rel == "" or rel == "/":
-        return None  # requesting the directory itself treat as not found
+        return None
 
     # remove leading slash to make it a relative path
     rel = rel.lstrip("/")
