@@ -14,8 +14,6 @@ def _get_or_create_session(request):
         doc = sessions_collection.find_one({"_id": session_id})
         if doc and "author" in doc:
             return session_id, doc["author"], False
-
-        # Cookie exists but missing from DB -> create mapping (no new cookie)
         author = f"user-{uuid.uuid4().hex[:8]}"
         sessions_collection.update_one(
             {"_id": session_id},
@@ -150,13 +148,7 @@ def add_reaction(request, handler):
         handler.request.sendall(res.to_data())
         return
 
-    try:
-        body_obj = json.loads(request.body.decode("utf-8"))
-    except Exception:
-        res = Response().set_status(400, "Bad Request").text("Bad Request")
-        handler.request.sendall(res.to_data())
-        return
-
+    body_obj = json.loads(request.body.decode("utf-8"))
     emoji = body_obj.get("emoji", "")
     if not isinstance(emoji, str) or emoji == "":
         res = Response().set_status(400, "Bad Request").text("Bad Request")
@@ -164,16 +156,15 @@ def add_reaction(request, handler):
         return
 
     reactions = doc.get("reactions", {}) or {}
-    users_for_emoji = reactions.get(emoji, []) or []
+    users = reactions.get(emoji, []) or []
 
-    if session_id in users_for_emoji:
-        # same user trying to react with same emoji again
+    if session_id in users:
         res = Response().set_status(403, "Forbidden").text("Forbidden")
         handler.request.sendall(res.to_data())
         return
 
-    users_for_emoji.append(session_id)
-    reactions[emoji] = users_for_emoji
+    users.append(session_id)
+    reactions[emoji] = users
 
     chat_collection.update_one({"id": message_id}, {"$set": {"reactions": reactions}})
     res = Response().set_status(200, "OK").text("OK")
@@ -194,65 +185,61 @@ def remove_reaction(request, handler):
         handler.request.sendall(res.to_data())
         return
 
-    try:
-        body_obj = json.loads(request.body.decode("utf-8"))
-    except Exception:
-        res = Response().set_status(400, "Bad Request").text("Bad Request")
-        handler.request.sendall(res.to_data())
-        return
-
+    body_obj = json.loads(request.body.decode("utf-8"))
     emoji = body_obj.get("emoji", "")
     if not isinstance(emoji, str) or emoji == "":
         res = Response().set_status(400, "Bad Request").text("Bad Request")
         handler.request.sendall(res.to_data())
         return
 
-    reactions = doc.get("reactions", {})
-    users_for_emoji = reactions.get(emoji, [])
+    reactions = doc.get("reactions", {}) or {}
+    users = reactions.get(emoji, []) or []
 
-    if session_id not in users_for_emoji:
-        # user tried to remove a reaction they don't have
-        res = Response().set_status(403, "Forbidden").text("Can't remove another person's reaction")
+    if session_id not in users:
+        res = Response().set_status(403, "Forbidden").text("Forbidden")
         handler.request.sendall(res.to_data())
         return
 
-    users_for_emoji.remove(session_id)
-
-    if len(users_for_emoji) == 0:
+    users.remove(session_id)
+    if len(users) == 0:
         reactions.pop(emoji, None)
     else:
-        reactions[emoji] = users_for_emoji
+        reactions[emoji] = users
 
     chat_collection.update_one({"id": message_id}, {"$set": {"reactions": reactions}})
     res = Response().set_status(200, "OK").text("OK")
     handler.request.sendall(res.to_data())
 
-def add_nickname(request, handler):
+
+def update_nickname(request, handler):
     session_id = _require_session(request)
     if not session_id:
         res = Response().set_status(403, "Forbidden").text("Forbidden")
         handler.request.sendall(res.to_data())
         return
-    try:
-        body_obj = json.loads(request.body.decode("utf-8"))
-    except Exception:
-        res = Response().set_status(403,"Forbidden").text("Forbidden")
-        handler.request.send(res.to_data())
-        return
-    nickname = body_obj.get("nickname", "")
-    if not isinstance(nickname. str):
+    body_obj = json.loads(request.body.decode("utf-8"))
+    nickname_raw = body_obj.get("nickname", "")
+    if not isinstance(nickname_raw, str):
         res = Response().set_status(400, "Bad Request").text("Bad Request")
-        handler.request.send(res.to_data())
+        handler.request.sendall(res.to_data())
         return
-    change_nickname = html.escape(nickname, quote=True)
+
+    nickname = html.escape(nickname_raw, quote=True).strip()
+    if nickname == "":
+        res = Response().set_status(400, "Bad Request").text("Bad Request")
+        handler.request.sendall(res.to_data())
+        return
+
+    # save nickname on session doc
     sessions_collection.update_one(
-        {"id": session_id},
-        {"$set": {"nickname": change_nickname, "author": change_nickname}},
+        {"_id": session_id},
+        {"$set": {"nickname": nickname}},
         upsert=True,
     )
+    # retroactively update nickname on old messages
     chat_collection.update_many(
         {"session": session_id},
-        {"$set": {"author": change_nickname, "nickname": change_nickname}},
+        {"$set": {"nickname": nickname}},
     )
     res = Response().set_status(200, "OK").text("OK")
     handler.request.sendall(res.to_data())
