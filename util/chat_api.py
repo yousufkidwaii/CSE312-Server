@@ -41,6 +41,8 @@ def create_chat(request, handler):
     content = html.escape(body_obj.get("content", ""), quote=True)
 
     session_id, author, is_new = _get_or_create_session(request)
+    session_doc = sessions_collection.find_one({"_id": session_id}) or {}
+    nickname = session_doc.get("nickname")
     msg_id = uuid.uuid4().hex
 
     chat_collection.insert_one(
@@ -50,12 +52,14 @@ def create_chat(request, handler):
             "content": content,
             "updated": False,
             "session": session_id,   # ownership check
-            "deleted": False,        # soft delete
+            "deleted": False, # soft delete
+            "reactions": {},
+            "nickname": nickname if isinstance(nickname, str) else None,
         }
     )
 
     # Spec says response must be EXACTLY this string
-    res = Response().set_status(200, "OK").text("Great work sending a chat message!!")
+    res = Response().set_status(200, "O").text("good job gang u sent a chat")
     if is_new:
         res.cookies({"session": session_id})
     handler.request.sendall(res.to_data())
@@ -66,14 +70,16 @@ def get_chats(request, handler):
 
     messages = []
     for d in docs:
-        messages.append(
-            {
+        msg = {
                 "author": d.get("author", ""),
                 "id": d.get("id", ""),
                 "content": d.get("content", ""),
                 "updated": bool(d.get("updated", False)),
+                "reactions": d.get("reactions", {}) or {},
             }
-        )
+        if "nickname" in d and isinstance(d.get("nickname"), str):
+            msg["nickname"] = d.get("nickname")
+        messages.append(msg)
 
     res = Response().json({"messages": messages})
     handler.request.sendall(res.to_data())
@@ -127,4 +133,126 @@ def delete_chat(request, handler):
 
     chat_collection.update_one({"id": msg_id}, {"$set": {"deleted": True}})
     res = Response().set_status(200, "OK").text("deleted")
+    handler.request.sendall(res.to_data())
+
+
+def add_reaction(request, handler):
+    session_id = _require_session(request)
+    if not session_id:
+        res = Response().set_status(403, "Forbidden").text("Forbidden")
+        handler.request.sendall(res.to_data())
+        return
+
+    message_id = request.path.split("/api/reaction/", 1)[1]
+    doc = chat_collection.find_one({"id": message_id, "deleted": {"$ne": True}})
+    if not doc:
+        res = Response().set_status(404, "Not Found").text("Not Found")
+        handler.request.sendall(res.to_data())
+        return
+
+    try:
+        body_obj = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        res = Response().set_status(400, "Bad Request").text("Bad Request")
+        handler.request.sendall(res.to_data())
+        return
+
+    emoji = body_obj.get("emoji", "")
+    if not isinstance(emoji, str) or emoji == "":
+        res = Response().set_status(400, "Bad Request").text("Bad Request")
+        handler.request.sendall(res.to_data())
+        return
+
+    reactions = doc.get("reactions", {}) or {}
+    users_for_emoji = reactions.get(emoji, []) or []
+
+    if session_id in users_for_emoji:
+        # same user trying to react with same emoji again
+        res = Response().set_status(403, "Forbidden").text("Forbidden")
+        handler.request.sendall(res.to_data())
+        return
+
+    users_for_emoji.append(session_id)
+    reactions[emoji] = users_for_emoji
+
+    chat_collection.update_one({"id": message_id}, {"$set": {"reactions": reactions}})
+    res = Response().set_status(200, "OK").text("OK")
+    handler.request.sendall(res.to_data())
+
+
+def remove_reaction(request, handler):
+    session_id = _require_session(request)
+    if not session_id:
+        res = Response().set_status(403, "Forbidden").text("Forbidden")
+        handler.request.sendall(res.to_data())
+        return
+
+    message_id = request.path.split("/api/reaction/", 1)[1]
+    doc = chat_collection.find_one({"id": message_id, "deleted": {"$ne": True}})
+    if not doc:
+        res = Response().set_status(404, "Not Found").text("Not Found")
+        handler.request.sendall(res.to_data())
+        return
+
+    try:
+        body_obj = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        res = Response().set_status(400, "Bad Request").text("Bad Request")
+        handler.request.sendall(res.to_data())
+        return
+
+    emoji = body_obj.get("emoji", "")
+    if not isinstance(emoji, str) or emoji == "":
+        res = Response().set_status(400, "Bad Request").text("Bad Request")
+        handler.request.sendall(res.to_data())
+        return
+
+    reactions = doc.get("reactions", {})
+    users_for_emoji = reactions.get(emoji, [])
+
+    if session_id not in users_for_emoji:
+        # user tried to remove a reaction they don't have
+        res = Response().set_status(403, "Forbidden").text("Can't remove another person's reaction")
+        handler.request.sendall(res.to_data())
+        return
+
+    users_for_emoji.remove(session_id)
+
+    if len(users_for_emoji) == 0:
+        reactions.pop(emoji, None)
+    else:
+        reactions[emoji] = users_for_emoji
+
+    chat_collection.update_one({"id": message_id}, {"$set": {"reactions": reactions}})
+    res = Response().set_status(200, "OK").text("OK")
+    handler.request.sendall(res.to_data())
+
+def add_nickname(request, handler):
+    session_id = _require_session(request)
+    if not session_id:
+        res = Response().set_status(403, "Forbidden").text("Forbidden")
+        handler.request.sendall(res.to_data())
+        return
+    try:
+        body_obj = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        res = Response().set_status(403,"Forbidden").text("Forbidden")
+        handler.request.send(res.to_data())
+        return
+    nickname = body_obj.get("nickname", "")
+    if not isinstance(nickname. str):
+        res = Response().set_status(400, "Bad Request").text("Bad Request")
+        handler.request.send(res.to_data())
+        return
+    change_nickname = html.escape(nickname, quote=True)
+    sessions_collection.update_one(
+        {"id": session_id},
+        {"$set": {"nickname": change_nickname, "author": change_nickname}},
+        upsert=True,
+    )
+    chat_collection.update_many(
+        {"session": session_id},
+        {"$set": {"author": change_nickname, "nickname": change_nickname}},
+    )
+    res = Response().set_status(200, "OK").text("OK")
     handler.request.sendall(res.to_data())
