@@ -26,6 +26,11 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
         self.router.add_route("DELETE","/api/reaction/", remove_reaction, False)
         #nicknameeeeee
         self.router.add_route("PATCH","/api/nickname",update_nickname,False)
+        #render hw2
+        self.router.add_route("GET", "/register", render_page("register.html"), True)
+        self.router.add_route("GET", "/login", render_page("login.html"), True)
+        self.router.add_route("GET", "/settings", render_page("settings.html"), True)
+        self.router.add_route("GET", "/search-users", render_page("search-users.html"), True)
         super().__init__(request, client_address, server)
 
     def handle(self):
