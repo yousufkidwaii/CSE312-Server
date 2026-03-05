@@ -1,11 +1,15 @@
 import json
 import uuid
 import html
+import bcrypt
 
 from util.database import db, chat_collection
 from util.response import Response
+from util.auth import extract_credentials, validate_password
 
 sessions_collection = db["sessions"]
+user_collection = db["users"]
+token_collection = db["auth_token"]
 
 
 def _get_or_create_session(request):
@@ -242,3 +246,70 @@ def update_nickname(request, handler):
     )
     res = Response().set_status(200, "OK").text("OK")
     handler.request.sendall(res.to_data())
+
+'''
+==============================================
+    HOMEWORK 2 LOs BEING HERE
+===============================================
+'''
+
+def user_registration(request, handler):
+    credentials = extract_credentials(request)
+    if credentials is None or len(credentials) < 2:
+        res = Response().set_status(400, "Bad Request").text("Bad Request")
+        handler.request.sendall(res.to_data())
+        return
+    username, password = credentials
+    if not validate_password(password):
+        res = Response().set_status(400, "Bad Request").text("Invalid Password")
+        handler.request.sendall(res.to_data())
+        return
+    if user_collection.find_one({"username": username}):
+        res = Response().set_status(400, "Bad Request").text("Username is Taken")
+        handler.request.sendall(res.to_data())
+        return
+    user_id = sessions_collection["author"]
+    hashed_pw = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
+
+    user_collection.insert_one({
+        "id": user_id,
+        "username": username,
+        "password": hashed_pw
+    })
+
+    res = Response().set_status(200, "OK").text("OK")
+    handler.request.sendall(res.to_data())
+
+def user_login(request,handler):
+    credentials = extract_credentials(request)
+    if credentials is None or len(credentials) < 2:
+        res = Response().set_status(400, "Bad Request").text("Invalid Request")
+        handler.request.sendall(res.to_data())
+        return
+    username, password = credentials
+    doc = user_collection.find_one({"username": username})
+    if not doc:
+        res = Response().set_status(400, "Bad Request").text("Invalid username or password")
+        handler.request.sendall(res.to_data())
+        return
+    check_pw = bcrypt.checkpw(password.encode("utf-8"),doc["password"])
+    if not check_pw:
+        res = Response().set_status(400, "Bad Request").text("Invalid username or password")
+        handler.request.sendall(res.to_data())
+        return
+    auth_token = uuid.uuid4().hex
+    hashed_token = bcrypt.hashpw(auth_token.encode("utf-8"), bcrypt.gensalt())
+
+    token_collection.insert_one({
+        "id": doc["id"],
+        "token": hashed_token
+    })
+    res = Response().set_status(200, "OK").text("Login successful.")
+    res.cookies({
+        "auth_token": auth_token,
+        "HttpOnly": True,
+        "Max-Age": 30*24*60*60
+    })
+    handler.request.sendall(res.to_data())
+
+
