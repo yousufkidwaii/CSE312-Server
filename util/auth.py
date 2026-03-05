@@ -69,7 +69,7 @@ def validate_password(password):
                 lowercase = True
             elif char.isupper():
                 uppercase = True
-            elif char.numbers():
+            elif char.isdigit():
                 numbers = True
             elif char in special_chars:
                 special = True
