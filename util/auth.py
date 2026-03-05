@@ -53,7 +53,12 @@ def percent_decoding(password):
     return decoded
 
 def validate_password(password):
+    characters = ("1234567890"
+                     "abcdefghijklmnopqrstuvwxyz"
+                     "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                     "!@#$%^&()-_=")
     special_chars = "!@#$%^&()-_="
+
     if len(password) < 8:
         return False
     lowercase = False
@@ -62,19 +67,21 @@ def validate_password(password):
     special = False
 
     for char in password:
-        if char.islower():
-            lowercase = True
-        elif char.isupper():
-            uppercase = True
-        elif char.isdigit():
-            numbers = True
-        elif char in special_chars:
-            special = True
+        if char in characters:
+            if char.islower():
+                lowercase = True
+            elif char.isupper():
+                uppercase = True
+            elif char.numbers():
+                numbers = True
+            elif char in special_chars:
+                special = True
+        else:
+            return False
 
     if lowercase and uppercase and numbers and special == True:
         return True
-    else:
-        return False
+
 
 
 def extraction_test():
