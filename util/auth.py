@@ -3,7 +3,6 @@ from util.request import Request
 def extract_credentials(request):
     body = request.body.decode("utf-8")
     parts = body.split("&")
-
     username = ""
     password = ""
     credentials = []

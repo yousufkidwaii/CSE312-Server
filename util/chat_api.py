@@ -56,8 +56,7 @@ def create_chat(request, handler):
         }
     )
 
-    # Spec says response must be EXACTLY this string
-    res = Response().set_status(200, "O").text("good job gang u sent a chat")
+    res = Response().set_status(200, "OK").text("good job gang u sent a chat")
     if is_new:
         res.cookies({"session": session_id})
     handler.request.sendall(res.to_data())
