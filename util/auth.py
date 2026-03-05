@@ -53,10 +53,7 @@ def percent_decoding(password):
     return decoded
 
 def validate_password(password):
-    characters = ("1234567890"
-                     "abcdefghijklmnopqrstuvwxyz"
-                     "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                     "!@#$%^&()-_=")
+    characters = "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!@#$%^&()-_="
     special_chars = "!@#$%^&()-_="
 
     if len(password) < 8:
