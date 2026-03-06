@@ -268,11 +268,11 @@ def user_registration(request, handler):
         res = Response().set_status(400, "Bad Request").text("Username is Taken")
         handler.request.sendall(res.to_data())
         return
-    user_id = sessions_collection["author"]
+    user_id = f"user-{uuid.uuid4().hex[:8]}"
     hashed_pw = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
 
     user_collection.insert_one({
-        "id": user_id,
+        "user": user_id,
         "username": username,
         "password": hashed_pw
     })
@@ -312,4 +312,5 @@ def user_login(request,handler):
     })
     handler.request.sendall(res.to_data())
 
+#def user_logout(request, handler):
 
