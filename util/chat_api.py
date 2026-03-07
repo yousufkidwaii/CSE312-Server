@@ -368,6 +368,7 @@ def get_me(request, handler):
     token = request.cookies.get("auth_token")
     if not token:
         res = Response().set_status(401, "Unauthorized").text("Unauthorized")
+        #lol
         handler.request.sendall(res.to_data())
         return
 
