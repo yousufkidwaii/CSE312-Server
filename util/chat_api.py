@@ -103,6 +103,7 @@ def get_chats(request, handler):
         messages.append(msg)
     res = Response().json({"messages": messages})
     handler.request.sendall(res.to_data())
+
 def update_chat(request, handler):
     session_id = _require_session(request)
     if not session_id:
@@ -373,8 +374,22 @@ def get_me(request, handler):
 
 
 
-#def search_users(request,handler):
-    #query = request.query(request)
-    #username = query.split("=",1)[1]
+def search_users(request,handler):
+    id, sep, search = request.query.partition("=")
+
+    if not search:
+        res = Response().set_status(200,"OK").json({"users": []})
+        handler.request.sendall(res.to_data())
+        return
+
+    cursor = user_collection.find({},{"username": 1})
+    users_list= [
+        {"id": str(user["_id"]), "username": user["username"]}
+        for user in cursor
+        if user["username"].startswith(search)
+    ]
+    res = Response().set_status(200, "OK").json({"users": users_list})
+    handler.request.sendall(res.to_data())
+
 
 

@@ -4,6 +4,7 @@ class Request:
         self.body = b""
         self.method = ""
         self.path = ""
+        self.query = ""
         self.http_version = ""
         self.headers = {}
         self.cookies = {}
