@@ -2,6 +2,7 @@ import json
 import uuid
 import html
 import bcrypt
+import hashlib
 
 from util.database import db, chat_collection
 from util.response import Response
@@ -9,13 +10,13 @@ from util.auth import extract_credentials, validate_password
 
 sessions_collection = db["sessions"]
 user_collection = db["users"]
-token_collection = db["auth_token"]
 
 
 def _get_or_create_session(request):
     if "session" in request.cookies:
         session_id = request.cookies["session"].strip()
         doc = sessions_collection.find_one({"_id": session_id})
+
         if doc and "author" in doc:
             return session_id, doc["author"], False
         author = f"user-{uuid.uuid4().hex[:8]}"
@@ -27,7 +28,7 @@ def _get_or_create_session(request):
         return session_id, author, False
 
     session_id = uuid.uuid4().hex
-    author = f"user-{uuid.uuid4().hex[:8]}"
+    author = user_collection.find_one({"user"})
     sessions_collection.insert_one({"_id": session_id, "author": author})
     return session_id, author, True
 
@@ -37,12 +38,29 @@ def _require_session(request):
         return None
     return request.cookies["session"].strip()
 
+def require_auth(request):
+    if "auth_token" not in request.cookies:
+        return None
+    return request.cookies["auth_token"].strip()
 
 def create_chat(request, handler):
     body_obj = json.loads(request.body.decode("utf-8"))
     content = html.escape(body_obj.get("content", ""), quote=True)
 
-    session_id, author, is_new = _get_or_create_session(request)
+    author = None
+
+    token = request.cookies.get("auth_token")
+    if token:
+        hashed_token = hashlib.sha256(token.encode('utf-8')).digest()
+        token_doc = token_collection.find_one({"token": hashed_token})
+        if token_doc:
+            user_doc = user_collection.find_one({"id": token_doc["id"]})
+            if user_doc:
+                author = user_doc["username"]
+
+    session_id, guest, is_new = _get_or_create_session(request)
+    if not author:
+        author = guest
     session_doc = sessions_collection.find_one({"_id": session_id}) or {}
     nickname = session_doc.get("nickname")
     msg_id = uuid.uuid4().hex
@@ -87,11 +105,14 @@ def get_chats(request, handler):
 
 
 def update_chat(request, handler):
-    session_id = _require_session(request)
-    if not session_id:
+    token = request.cookies.get("auth_token")
+    if not token:
         res = Response().set_status(403, "Forbidden").text("Forbidden")
         handler.request.sendall(res.to_data())
         return
+
+    hashed_token = hashlib.sha256(token.encode()).hexdigest()
+    token_doc = token_colection.find_one({"token": hashed_token})
 
     msg_id = request.path.split("/api/chats/", 1)[1]
     doc = chat_collection.find_one({"id": msg_id, "deleted": {"$ne": True}})
@@ -100,7 +121,7 @@ def update_chat(request, handler):
         handler.request.sendall(res.to_data())
         return
 
-    if doc.get("session") != session_id:
+    if not token_doc:
         res = Response().set_status(403, "Forbidden").text("Forbidden")
         handler.request.sendall(res.to_data())
         return
@@ -114,8 +135,16 @@ def update_chat(request, handler):
 
 
 def delete_chat(request, handler):
-    session_id = _require_session(request)
-    if not session_id:
+    token = request.cookies.get("auth_token")
+    if not token:
+        res = Response().set_status(403, "Forbidden").text("Forbidden")
+        handler.request.sendall(res.to_data())
+        return
+
+    hashed_token = hashlib.sha256(token.encode()).hexdigest()
+    token_doc = token_colection.find_one({"token": hashed_token})
+
+    if not token_doc:
         res = Response().set_status(403, "Forbidden").text("Forbidden")
         handler.request.sendall(res.to_data())
         return
@@ -126,12 +155,12 @@ def delete_chat(request, handler):
         res = Response().set_status(404, "Not Found").text("Not Found")
         handler.request.sendall(res.to_data())
         return
-
-    if doc.get("session") != session_id:
+    '''
+    if token_doc.get("session") != session_id:
         res = Response().set_status(403, "Forbidden").text("Forbidden")
         handler.request.sendall(res.to_data())
         return
-
+    '''
     chat_collection.update_one({"id": msg_id}, {"$set": {"deleted": True}})
     res = Response().set_status(200, "OK").text("deleted")
     handler.request.sendall(res.to_data())
@@ -268,11 +297,13 @@ def user_registration(request, handler):
         res = Response().set_status(400, "Bad Request").text("Username is Taken")
         handler.request.sendall(res.to_data())
         return
-    user_id = f"user-{uuid.uuid4().hex[:8]}"
+    #user_id = f"user-{uuid.uuid4().hex[:8]}"
     hashed_pw = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
+    #auth_token = uuid.uuid4().hex
+    #hashed_token = hashlib.sha256(auth_token.encode('utf-8')).digest()
 
     user_collection.insert_one({
-        "user": user_id,
+        #"user": user_id,
         "username": username,
         "password": hashed_pw
     })
@@ -298,12 +329,12 @@ def user_login(request,handler):
         handler.request.sendall(res.to_data())
         return
     auth_token = uuid.uuid4().hex
-    hashed_token = bcrypt.hashpw(auth_token.encode("utf-8"), bcrypt.gensalt())
+    hashed_token = hashlib.sha256(auth_token.encode('utf-8')).digest()
 
-    token_collection.insert_one({
-        "id": doc["id"],
-        "token": hashed_token
-    })
+    user_collection.update_one(
+        {"_id": doc["_id"]},
+        {"$set": {"auth_token": hashed_token}}
+    )
     res = Response().set_status(200, "OK").text("Login successful.")
     res.cookies({
         "auth_token": auth_token,
@@ -312,5 +343,56 @@ def user_login(request,handler):
     })
     handler.request.sendall(res.to_data())
 
-#def user_logout(request, handler):
+def user_logout(request, handler):
+    token = request.cookies.get("auth_token")
+    if not token:
+        res = Response().set_status(302, "Unauthorized").text("You're logged out already")
+        handler.request.sendall(res.to_data())
+        return
+
+    hashed_token = hashlib.sha256(token.encode('utf-8')).digest()
+    token_doc = user_collection.update_one(
+        {"auth_token": hashed_token},
+        {"$set": {"auth_token": ""}}
+    )
+
+    res = Response().set_status(302,"Found").text("Logout successful")
+    res.cookies({
+        "auth_token": "",
+        "HttpOnly": True,
+        "Max-Age": 0
+    })
+    handler.request.sendall(res.to_data())
+
+def get_me(request, handler):
+    token = request.cookies.get("auth_token")
+    if not token:
+        res = Response().set_status(401, "Unauthorized").text("Unauthorized")
+        handler.request.sendall(res.to_data())
+        return
+
+    hashed_token = hashlib.sha256(token.encode()).hexdigest()
+    token_doc = user_collection.find_one({"auth_token": hashed_token})
+
+    if not token_doc:
+        res = Response().set_status(401, "Unauthorized").text("Unauthorized")
+        handler.request.sendall(res.to_data())
+        return
+
+    user_doc = user_collection.find_one({"-id": token_doc["_id"]})
+    if not user_doc:
+        res = Response().set_status(401, "Unauthorized").text("Unauthorized")
+        handler.request.sendall(res.to_data())
+        return
+    response = {
+        "username": user_doc.get("username"),
+        "_id": user_doc.get("_id")
+    }
+    res = Response().set_status(200, "OK").json(response)
+    handler.request.sendall(res.to_data())
+
+#def search_users(request,handler):
+    #query = request.query(request)
+    #username = query.split("=",1)[1]
+
 

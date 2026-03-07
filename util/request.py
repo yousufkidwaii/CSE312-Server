@@ -27,7 +27,11 @@ class Request:
             raise ValueError("Invalid request line")
 
         self.method = parts[0]
-        self.path = parts[1].split("?", 1)[0]
+        self.path = parts[1].split("?",1)[0]
+        if "?" in self.path:
+            self.query = parts[1].split("?",1)[1]
+        else:
+            self.query = ""
         self.http_version = parts[2]
 
         # Headers
@@ -51,11 +55,16 @@ class Request:
 
 
 def test1():
-    request = Request(b'GET / HTTP/1.1\r\nHost: localhost:8080\r\nConnection: keep-alive\r\n\r\n')
+    request = Request(b'GET /api/users/search?user=ninja HTTP/1.1\r\nHost: localhost:8080\r\nConnection: keep-alive\r\n\r\n')
     assert request.method == "GET"
+    assert request.path == "/api/users/search"
+    assert request.query == "user=ninja"
     assert "Host" in request.headers
     assert request.headers["Host"] == "localhost:8080"  # note: The leading space in the header value must be removed
-    assert request.body == b""  # There is no body for this request.
+    assert request.body == b""
+    print(request.query)
+    print(request.path)
+    # There is no body for this request.
     # When parsing POST requests, the body must be in bytes, not str
 
     # This is the start of a simple way (ie. no external libraries) to test your code.
