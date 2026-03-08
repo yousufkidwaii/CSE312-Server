@@ -61,15 +61,11 @@ class Response:
             response_lines.append(f"{k}: {self.header_store[k]}")
 
         if self.cookie_store:
-            items = list(self.cookie_store.items())
-            cookie_name, cookie_value = items[0]
-            cookie_line = f"Set-Cookie: {cookie_name}={cookie_value}"
-            for k, v in items[1:]:
-                if k == "HttpOnly":
-                    cookie_line += f"; {k}"
-                else:
-                    cookie_line += f"; {k}={v}"
-            response_lines.append(cookie_line)
+            for cookie_name, cookie_value in self.cookie_store.items():
+                cookie_line = f"Set-Cookie: {cookie_name}={cookie_value}"
+                if cookie_name == "auth_token":
+                    cookie_line += "; HttpOnly"
+                response_lines.append(cookie_line)
 
         response_lines.append("")
         header_bytes = "\r\n".join(response_lines).encode("utf-8")
