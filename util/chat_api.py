@@ -325,6 +325,7 @@ def user_login(request,handler):
     res = Response().set_status(200, "OK").text("Login successful.")
     res.cookies({
         "auth_token": auth_token,
+        "HttpOnly": True,  # flag directive
         "Max-Age": 30 * 24 * 60 * 60,
     })
     handler.request.sendall(res.to_data())
@@ -348,7 +349,8 @@ def user_logout(request, handler):
 
     res = Response().set_status(302,"Found").text("Logout successful")
     res.cookies({
-        "auth_token": "",
+        "auth_token": "",  # empty value
+        "HttpOnly": True,  # still HttpOnly for security
         "Max-Age": 0,
     })
     handler.request.sendall(res.to_data())

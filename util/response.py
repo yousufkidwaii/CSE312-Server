@@ -21,9 +21,23 @@ class Response:
             self.header_store[str(k)] = str(headers[k])
         return self
 
-    def cookies(self, cookies):
-        for k in cookies:
-            self.cookie_store[str(k)] = str(cookies[k])
+    def cookies(self, cookie_dict):
+        if not cookie_dict:
+            return self
+
+        items = list(cookie_dict.items())
+        main_cookie_name, main_cookie_value = items[0]
+        directives = items[1:]
+
+        cookie_entry = {
+            "value": main_cookie_value,
+            "directives": directives
+        }
+
+        if main_cookie_name not in self.cookie_store:
+            self.cookie_store[main_cookie_name] = []
+        self.cookie_store[main_cookie_name].append(cookie_entry)
+
         return self
 
     def bytes(self, data):
@@ -52,25 +66,24 @@ class Response:
         if "Content-Type" not in self.header_store:
             self.header_store["Content-Type"] = "text/plain; charset=utf-8"
         self.header_store["Content-Length"] = str(len(self.body_store))
-        response_lines = []
 
-        status_line = f"HTTP/1.1 {self.status_code} {self.status_text}"
-        response_lines.append(status_line)
+        response_lines = [f"HTTP/1.1 {self.status_code} {self.status_text}"]
 
-        for k in self.header_store:
-            response_lines.append(f"{k}: {self.header_store[k]}")
+        for k, v in self.header_store.items():
+            response_lines.append(f"{k}: {v}")
 
-        if self.cookie_store:
-            for cookie_name, cookie_value in self.cookie_store.items():
-                cookie_line = f"Set-Cookie: {cookie_name}={cookie_value}"
-                if cookie_name == "auth_token":
-                    cookie_line += "; HttpOnly"
+        for cookie_name, cookie_entries in self.cookie_store.items():
+            for entry in cookie_entries:
+                cookie_line = f"Set-Cookie: {cookie_name}={entry['value']}"
+                for k, v in entry['directives']:
+                    if v is True or v is None:
+                        cookie_line += f"; {k}"
+                    else:
+                        cookie_line += f"; {k}={v}"
                 response_lines.append(cookie_line)
 
         response_lines.append("")
-        header_bytes = "\r\n".join(response_lines).encode("utf-8")
-
-        return header_bytes + b"\r\n" + self.body_store
+        return "\r\n".join(response_lines).encode("utf-8") + b"\r\n" + self.body_store
 
 
 def test1():
