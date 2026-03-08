@@ -349,7 +349,7 @@ def user_logout(request, handler):
 
     res = Response().set_status(302,"Found").text("Logout successful")
     res.cookies({
-        "auth_token": "",
+        "auth_token": None,
         "HttpOnly": True,
         "Max-Age": 0
     })

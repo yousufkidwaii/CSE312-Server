@@ -83,7 +83,7 @@ def test1():
          "HttpOnly": "True",
          "Max-Age": "0"}
     )
-    expected = b'HTTP/1.1 200 OK\r\nX-Content-Type: text/plain; charset=utf-8\r\nSet-Cookie: auth_token=123; HttpOnly=True; Max-Age=0\r\nContent-Length: 0\r\n\r\n'
+    expected = b'HTTP/1.1 200 OK\r\nX-Content-Type: no sniff\r\nContent-Type: text/plain; charset=utf-8\r\nSet-Cookie: auth_token=123; HttpOnly=True; Max-Age=0\r\nContent-Length: 0\r\n\r\n'
     actual = res.to_data()
     print(actual.decode())
     print(expected.decode())
