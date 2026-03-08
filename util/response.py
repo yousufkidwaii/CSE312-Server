@@ -60,8 +60,14 @@ class Response:
         for k in self.header_store:
             response_lines.append(f"{k}: {self.header_store[k]}")
 
-        for k in self.cookie_store:
-            response_lines.append(f"Set-Cookie: {k}={self.cookie_store[k]}")
+        if self.cookie_store:
+            items = list(self.cookie_store.items())
+            cookie_name, cookie_value = items[0]
+            attributes = [f"{k}={v}" for k,v in items[1:]]
+            cookie_line = f"Set-Cookie: {cookie_name}={cookie_value}"
+            if attributes:
+                cookie_line += "; "+ "; ".join(attributes)
+            response_lines.append(cookie_line)
 
         response_lines.append("")
         header_bytes = "\r\n".join(response_lines).encode("utf-8")
@@ -70,11 +76,18 @@ class Response:
 
 
 def test1():
+    #res = Response(b'HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: 5\r\n\r\nhello')
     res = Response()
-    res.text("hello")
-    expected = b'HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: 5\r\n\r\nhello'
+    res.cookies(
+        {"auth_token": "123",
+         "HttpOnly": "True",
+         "Max-Age": "0"}
+    )
+    expected = b'HTTP/1.1 200 OK\r\nX-Content-Type: text/plain; charset=utf-8\r\nSet-Cookie: auth_token=123; HttpOnly=True; Max-Age=0\r\nContent-Length: 0\r\n\r\n'
     actual = res.to_data()
+    print(actual.decode())
+    print(expected.decode())
 
-
+    assert actual == expected
 if __name__ == '__main__':
     test1()

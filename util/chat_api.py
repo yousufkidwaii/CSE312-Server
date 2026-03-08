@@ -338,15 +338,14 @@ def user_logout(request, handler):
         return
 
     hashed_token = hashlib.sha256(token.encode('utf-8')).digest()
-    if hashed_token:
-        token_doc = user_collection.update_one(
-            {"auth_token": hashed_token},
-            {"$set": {"auth_token": None}}
-        )
-        if not token_doc:
-            res = Response().set_status(302, "Unauthorized").text("Logout not successful")
-            handler.request.sendall(res.to_data())
-            return
+    token_doc = user_collection.update_one(
+        {"auth_token": hashed_token},
+        {"$set": {"auth_token": None}}
+    )
+    if not token_doc:
+        res = Response().set_status(302, "Unauthorized").text("Logout not successful")
+        handler.request.sendall(res.to_data())
+        return
 
     res = Response().set_status(302,"Found").text("Logout successful")
     res.cookies({
