@@ -63,10 +63,12 @@ class Response:
         if self.cookie_store:
             items = list(self.cookie_store.items())
             cookie_name, cookie_value = items[0]
-            attributes = [f"{k}={v}" for k,v in items[1:]]
             cookie_line = f"Set-Cookie: {cookie_name}={cookie_value}"
-            if attributes:
-                cookie_line += "; "+ "; ".join(attributes)
+            for k, v in items[1:]:
+                if k == "HttpOnly":
+                    cookie_line += f"; {k}"
+                else:
+                    cookie_line += f"; {k}={v}"
             response_lines.append(cookie_line)
 
         response_lines.append("")
@@ -80,10 +82,10 @@ def test1():
     res = Response()
     res.cookies(
         {"auth_token": "123",
-         "HttpOnly": "True",
-         "Max-Age": "0"}
+         "Max-Age": "0",
+         "HttpOnly": None,}
     )
-    expected = b'HTTP/1.1 200 OK\r\nX-Content-Type: no sniff\r\nContent-Type: text/plain; charset=utf-8\r\nSet-Cookie: auth_token=123; HttpOnly=True; Max-Age=0\r\nContent-Length: 0\r\n\r\n'
+    expected = b'HTTP/1.1 200 OK\r\nX-Content-Type-Options: nosniff\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: 0\r\nSet-Cookie: auth_token=123; Max-Age=0; HttpOnly\r\n\r\n'
     actual = res.to_data()
     print(actual.decode())
     print(expected.decode())
