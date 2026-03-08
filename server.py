@@ -6,7 +6,7 @@ from util.static_paths import serve_public, render_page
 from util.chat_api import (create_chat, get_chats, update_chat, delete_chat,
                            add_reaction, remove_reaction,
                            update_nickname,
-                           user_registration, user_login, user_logout, get_me, search_users)
+                           user_registration, user_login, user_logout, get_me, search_users, update_users)
 
 
 class MyTCPHandler(socketserver.BaseRequestHandler):
@@ -40,6 +40,8 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
         self.router.add_route("GET","/logout",user_logout, True)
         self.router.add_route("GET", "/api/users/@me", get_me, True)
         self.router.add_route("GET", "/api/users/search", search_users, False)
+        self.router.add_route("POST", "/api/users/settings", update_users, True)
+
         super().__init__(request, client_address, server)
 
     def handle(self):

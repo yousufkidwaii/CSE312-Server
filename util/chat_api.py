@@ -349,7 +349,7 @@ def user_logout(request, handler):
 
     res = Response().set_status(302,"Found").text("Logout successful")
     res.cookies({
-        "auth_token": "",
+        "auth_token": None,
         "HttpOnly": True,
         "Max-Age": 0
     })
@@ -390,6 +390,47 @@ def search_users(request,handler):
         collection.append({"id": str(user["_id"]), "username": user["username"]})
     res = Response().set_status(200, "OK").json({"users": collection})
     handler.request.sendall(res.to_data())
+
+def update_users(request,handler):
+    credentials = extract_credentials(request)
+    if credentials is None or len(credentials) < 1:
+        res = Response().set_status(400, "Bad Request").text("Please enter credentials")
+        handler.request.sendall(res.to_data())
+        return
+    username = credentials[0]
+    password = credentials[1] if len(credentials) > 1 else ""
+
+    token = request.cookies.get("auth_token")
+    if not token:
+        res = Response().set_status(401, "Unauthorized").text("Unauthorized")
+        handler.request.sendall(res.to_data())
+        return
+    hashed_token = hashlib.sha256(token.encode("utf-8")).digest()
+    user_doc = user_collection.find_one({"auth_token": hashed_token})
+    if not user_doc:
+        res = Response().set_status(401, "Unauthorized").text("Unauthorized")
+        handler.request.sendall(res.to_data())
+        return
+    if password != "" and not validate_password(password):
+        res = Response().set_status(400, "Bad Request").text("Invalid password")
+        handler.request.sendall(res.to_data())
+        return
+    if username != user_doc["username"] and user_collection.find_one({"username": username}):
+        res = Response().set_status(400, "Bad Request").text("Username is taken")
+        handler.request.sendall(res.to_data())
+        return
+    update_fields = {"username": username}
+    if password != "":
+        hashed_pw = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+        update_fields["password"] = hashed_pw
+    user_collection.update_one(
+        {"_id": user_doc["_id"]},
+        {"$set": update_fields}
+    )
+    res = Response().set_status(200,"OK").text("OK")
+    handler.request.sendall(res.to_data())
+
+
 
 '''
 def extraction_test():
