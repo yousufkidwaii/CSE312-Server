@@ -6,6 +6,7 @@ import hashlib
 
 from util.database import db, chat_collection
 from util.response import Response
+from util.request import Request
 from util.auth import extract_credentials, validate_password
 
 sessions_collection = db["sessions"]
@@ -376,20 +377,28 @@ def get_me(request, handler):
 
 def search_users(request,handler):
     id, sep, search = request.query.partition("=")
+    search = search.strip()
 
-    if not search:
-        res = Response().set_status(200,"OK").json({"users": []})
+    if search == "":
+        res = Response().set_status(200, "OK").json({"users": []})
         handler.request.sendall(res.to_data())
         return
 
-    cursor = user_collection.find({},{"username": 1})
-    users_list= [
-        {"id": str(user["_id"]), "username": user["username"]}
-        for user in cursor
-        if user["username"].startswith(search)
-    ]
-    res = Response().set_status(200, "OK").json({"users": users_list})
+    cursor = user_collection.find({"username":{"$regex":f"^{search}"}})
+    collection = []
+    for user in cursor:
+        collection.append({"id": str(user["_id"]), "username": user["username"]})
+    res = Response().set_status(200, "OK").json({"users": collection})
     handler.request.sendall(res.to_data())
 
+'''
+def extraction_test():
+    request = Request(b'GET /api/users/search?user=yous HTTP/1.1\r\nHost: localhost:8080\r\nSec-Fetch-Dest: empty\r\nUser-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.3 Safari/605.1.15\r\nAccept: */*\r\nReferer: http://localhost:8080/search-users\r\nSec-Fetch-Site: same-origin\r\nSec-Fetch-Mode: cors\r\nAccept-Language: en-US,en;q=0.9\r\nPriority: u=3, i\r\nAccept-Encoding: gzip, deflate\r\nCookie: session=fc16749e2efc495fb8aedb63f1a56adc; Max-Age=2592000; auth_token=7e73954e394e411296c7709f368f5561; HttpOnly=True\r\nConnection: keep-alive\r\n\r\n')
+    response = search_users(request,handler)
+    data = json.loads(response.body.decode())
+    print(data)
+    assert b"yousufki" in response.body
 
-
+if __name__ == "__main__":
+    extraction_test()
+'''
