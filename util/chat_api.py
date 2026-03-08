@@ -376,8 +376,8 @@ def get_me(request, handler):
 
 
 def search_users(request,handler):
-    id, sep, search = request.query.partition("=")
-    search = search.strip()
+    query = request.path.split("?")
+    id,sep,search = query[1].partition("=")
 
     if search == "":
         res = Response().set_status(200, "OK").json({"users": []})
