@@ -54,6 +54,10 @@ class Request:
                 if "=" in pair:
                     k, v = pair.split("=", 1)
                     self.cookies[k] = v
+                else:
+                    k = pair
+                    v = None
+                    self.cookies[k] = v
 
 
 

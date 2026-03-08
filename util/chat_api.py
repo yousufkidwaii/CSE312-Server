@@ -325,8 +325,9 @@ def user_login(request,handler):
     res = Response().set_status(200, "OK").text("Login successful.")
     res.cookies({
         "auth_token": auth_token,
-        "Max-Age": 30 * 24 * 60 * 60,
         "HttpOnly": None,
+        "Max-Age": 30 * 24 * 60 * 60#,
+        #"HttpOnly": ""
     })
     handler.request.sendall(res.to_data())
 
@@ -349,9 +350,9 @@ def user_logout(request, handler):
 
     res = Response().set_status(302,"Found").text("Logout successful")
     res.cookies({
-        "auth_token": None,
-        "Max-Age": 0,
-        "HttpOnly": None
+        "auth_token": "",
+        "HttpOnly": None,
+        "Max-Age": 0
     })
     handler.request.sendall(res.to_data())
 #lol
