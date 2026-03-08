@@ -354,7 +354,7 @@ def user_logout(request, handler):
         "HttpOnly": None
     })
     handler.request.sendall(res.to_data())
-
+#lol
 
 def get_me(request, handler):
     token = request.cookies.get("auth_token")
