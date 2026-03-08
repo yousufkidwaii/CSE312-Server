@@ -325,9 +325,9 @@ def user_login(request,handler):
     res = Response().set_status(200, "OK").text("Login successful.")
     res.cookies({
         "auth_token": auth_token,
-        "HttpOnly": None,
+        "HttpOnly": True,
         "Max-Age": 30 * 24 * 60 * 60,
-        #"Path": "/login"#,
+        "Path": "/"#,
         #"HttpOnly": ""
     })
     handler.request.sendall(res.to_data())
@@ -352,9 +352,9 @@ def user_logout(request, handler):
     res = Response().set_status(302,"Found").text("Logout successful")
     res.cookies({
         "auth_token": "",
-        "HttpOnly": None,
+        "HttpOnly": True,
         "Max-Age": 0,
-        #"Path": "/"
+        "Path": "/"
     })
     handler.request.sendall(res.to_data())
 #lol
@@ -433,16 +433,3 @@ def update_users(request,handler):
     res = Response().set_status(200,"OK").text("OK")
     handler.request.sendall(res.to_data())
 
-
-
-'''
-def extraction_test():
-    request = Request(b'GET /api/users/search?user=yous HTTP/1.1\r\nHost: localhost:8080\r\nSec-Fetch-Dest: empty\r\nUser-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.3 Safari/605.1.15\r\nAccept: */*\r\nReferer: http://localhost:8080/search-users\r\nSec-Fetch-Site: same-origin\r\nSec-Fetch-Mode: cors\r\nAccept-Language: en-US,en;q=0.9\r\nPriority: u=3, i\r\nAccept-Encoding: gzip, deflate\r\nCookie: session=fc16749e2efc495fb8aedb63f1a56adc; Max-Age=2592000; auth_token=7e73954e394e411296c7709f368f5561; HttpOnly=True\r\nConnection: keep-alive\r\n\r\n')
-    response = search_users(request,handler)
-    data = json.loads(response.body.decode())
-    print(data)
-    assert b"yousufki" in response.body
-
-if __name__ == "__main__":
-    extraction_test()
-'''
