@@ -106,7 +106,7 @@ def get_chats(request, handler):
     handler.request.sendall(res.to_data())
 
 def update_chat(request, handler):
-    session_id = _require_session(request)
+    session_id, author, isnew = _get_or_create_session(request)
     if not session_id:
         res = Response().set_status(403, "Forbidden").text("Forbidden")
         handler.request.sendall(res.to_data())
@@ -117,7 +117,7 @@ def update_chat(request, handler):
         res = Response().set_status(404, "Not Found").text("Not Found")
         handler.request.sendall(res.to_data())
         return
-    if doc.get("session") != session_id:
+    if doc.get("author") != author:
         res = Response().set_status(403, "Forbidden").text("Forbidden")
         handler.request.sendall(res.to_data())
         return
@@ -127,7 +127,7 @@ def update_chat(request, handler):
     res = Response().set_status(200, "OK").text("updated")
     handler.request.sendall(res.to_data())
 def delete_chat(request, handler):
-    session_id = _require_session(request)
+    session_id, author, _ = _get_or_create_session(request)
     if not session_id:
         res = Response().set_status(403, "Forbidden").text("Forbidden")
         handler.request.sendall(res.to_data())
@@ -138,7 +138,7 @@ def delete_chat(request, handler):
         res = Response().set_status(404, "Not Found").text("Not Found")
         handler.request.sendall(res.to_data())
         return
-    if doc.get("session") != session_id:
+    if doc.get("author") != author:
         res = Response().set_status(403, "Forbidden").text("Forbidden")
         handler.request.sendall(res.to_data())
         return
@@ -349,7 +349,7 @@ def user_logout(request, handler):
 
     res = Response().set_status(302,"Found").text("Logout successful")
     res.cookies({
-        "auth_token": None,
+        "auth_token": "",
         "HttpOnly": True,
         "Max-Age": 0
     })
