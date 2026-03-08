@@ -291,25 +291,28 @@ def user_registration(request, handler):
     res = Response().set_status(200, "OK").text("OK")
     handler.request.sendall(res.to_data())
 
-def user_login(request,handler):
+def user_login(request, handler):
     credentials = extract_credentials(request)
     if credentials is None or len(credentials) < 2:
         res = Response().set_status(400, "Bad Request").text("Invalid Request")
         handler.request.sendall(res.to_data())
         return
+
     username, password = credentials
     doc = user_collection.find_one({"username": username})
     if not doc:
         res = Response().set_status(400, "Bad Request").text("Invalid username or password")
         handler.request.sendall(res.to_data())
         return
-    check_pw = bcrypt.checkpw(password.encode("utf-8"),doc["password"])
+
+    check_pw = bcrypt.checkpw(password.encode("utf-8"), doc["password"])
     if not check_pw:
         res = Response().set_status(400, "Bad Request").text("Invalid username or password")
         handler.request.sendall(res.to_data())
         return
+
     auth_token = uuid.uuid4().hex
-    hashed_token = hashlib.sha256(auth_token.encode('utf-8')).digest()
+    hashed_token = hashlib.sha256(auth_token.encode("utf-8")).digest()
 
     session_id = _require_session(request)
     sessions_collection.update_one(
@@ -322,35 +325,30 @@ def user_login(request,handler):
         {"_id": doc["_id"]},
         {"$set": {"auth_token": hashed_token}}
     )
+
     res = Response().set_status(200, "OK").text("Login successful.")
     res.cookies({
         "auth_token": auth_token,
-        "HttpOnly": True,  # flag directive
+        "HttpOnly": True,
         "Max-Age": 30 * 24 * 60 * 60,
     })
     handler.request.sendall(res.to_data())
 
+
 def user_logout(request, handler):
     token = request.cookies.get("auth_token")
-    if not token:
-        res = Response().set_status(302, "Unauthorized").text("You're logged out already")
-        handler.request.sendall(res.to_data())
-        return
+    if token:
+        hashed_token = hashlib.sha256(token.encode("utf-8")).digest()
+        user_collection.update_one(
+            {"auth_token": hashed_token},
+            {"$set": {"auth_token": None}}
+        )
 
-    hashed_token = hashlib.sha256(token.encode('utf-8')).digest()
-    token_doc = user_collection.update_one(
-        {"auth_token": hashed_token},
-        {"$set": {"auth_token": None}}
-    )
-    if not token_doc:
-        res = Response().set_status(302, "Unauthorized").text("Logout not successful")
-        handler.request.sendall(res.to_data())
-        return
-
-    res = Response().set_status(302,"Found").text("Logout successful")
+    res = Response().set_status(302, "Found").text("Logout successful")
+    res.headers({"Location": "/"})
     res.cookies({
-        "auth_token": "",  # empty value
-        "HttpOnly": True,  # still HttpOnly for security
+        "auth_token": "",
+        "HttpOnly": True,
         "Max-Age": 0,
     })
     handler.request.sendall(res.to_data())
