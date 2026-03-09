@@ -5,15 +5,15 @@ class Multipart:
         self.boundary = ""
         self.parts = []
         self.boundary = str(request.headers["Content-Type"])
-        self.parts = [parts.headers, parts.name, parts.content]
+        self.parts = [parts._headers, parts.name, parts.content]
 
 class Parts:
     def __init__(self, request):
-        self.headers = {}
+        self._headers = {}
         self.name = ""
         self.content = b''
 
-        self.headers = request.headers
+        self._headers = request.headers
         self.name = str(request.headers["Content-Disposition"])
         self.content = request.body
 
