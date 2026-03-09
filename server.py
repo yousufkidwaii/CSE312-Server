@@ -41,6 +41,8 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
         self.router.add_route("GET", "/api/users/@me", get_me, True)
         self.router.add_route("GET", "/api/users/search", search_users, False)
         self.router.add_route("POST", "/api/users/settings", update_users, True)
+        #render hw3
+        self.router.add_route("GET", "/change-avatar", render_page("change-avatar.html"), True)
 
         super().__init__(request, client_address, server)
 
