@@ -68,6 +68,6 @@ def parse_multipart(request):
         if next_boundary == -1:
             break
         content = body[content_start:next_boundary] #3
-        parts.append(Multipart(headers, name, content)) #5
+        parts.append(Part(headers, name, content)) #5
         count = next_boundary + 2
     return Multipart(boundary, parts)
