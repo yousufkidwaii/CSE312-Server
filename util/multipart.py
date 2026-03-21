@@ -2,7 +2,7 @@ from util.request import Request
 
 class Part:
     def __init__(self, headers, name, content):
-        self.boundary = headers
+        self.headers = headers
         self.name = name
         self.content = content
 
