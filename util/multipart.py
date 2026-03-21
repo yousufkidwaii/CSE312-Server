@@ -1,12 +1,12 @@
 from util.request import Request
 
-class Multipart:
+class Part:
     def __init__(self, headers, name, content):
         self.boundary = headers
         self.name = name
         self.content = content
 
-class Parts:
+class Multipart:
     def __init__(self, boundary, parts):
         self.boundary = boundary
         self.parts = parts
@@ -18,7 +18,7 @@ def extract_boundary(content_type):
         if part.startswith("boundary="):
             boundary = part[len("boundary="):]
             return boundary.strip('"')
-    raise ValueError("Boundary Not Found")
+    return ""
 
 def parse_headers(header_bytes):
     headers = {}
@@ -26,7 +26,7 @@ def parse_headers(header_bytes):
     for line in lines:
         if ":" in line:
             key, value = line.split(":", 1)
-            headers[key] = value.strip()
+            headers[key] = value
     return headers
 
 def extract_name(headers):
@@ -70,4 +70,4 @@ def parse_multipart(request):
         content = body[content_start:next_boundary] #3
         parts.append(Multipart(headers, name, content)) #5
         count = next_boundary + 2
-    return Parts(boundary, parts)
+    return Multipart(boundary, parts)
