@@ -126,6 +126,7 @@ def update_chat(request, handler):
     chat_collection.update_one({"id": msg_id}, {"$set": {"content": content, "updated": True}})
     res = Response().set_status(200, "OK").text("updated")
     handler.request.sendall(res.to_data())
+
 def delete_chat(request, handler):
     session_id, author, _ = _get_or_create_session(request)
     if not session_id:
