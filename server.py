@@ -6,7 +6,8 @@ from util.static_paths import serve_public, render_page
 from util.chat_api import (create_chat, get_chats, update_chat, delete_chat,
                            add_reaction, remove_reaction,
                            update_nickname,
-                           user_registration, user_login, user_logout, get_me, search_users, update_users)
+                           user_registration, user_login, user_logout, get_me, search_users, update_users,
+                           upload_avatar, upload_video, get_videos, get_single_video)
 
 
 class MyTCPHandler(socketserver.BaseRequestHandler):
@@ -47,6 +48,11 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
         self.router.add_route("GET", "/videotube/upload", render_page("upload.html"), True)
         self.router.add_route("GET", "/videotube/upload/{videoID}", render_page("view-video.html"), True)
         self.router.add_route("GET", "/videotube/set-thumbnail", render_page("set-thumbnail.html"), True)
+        #avatar and video
+        self.router.add_route("POST", "/api/users/avatar", upload_avatar, True)
+        self.router.add_route("POST", "/api/videos", upload_video, True)
+        self.router.add_route("GET", "/api/videos", get_videos, True)
+        self.router.add_route("GET", "/api/videos/", get_single_video, False)
         super().__init__(request, client_address, server)
 
     def handle(self):
