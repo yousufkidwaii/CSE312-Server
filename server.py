@@ -46,7 +46,7 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
         self.router.add_route("GET", "/change-avatar", render_page("change-avatar.html"), True)
         self.router.add_route("GET", "/videotube", render_page("videotube.html"), True)
         self.router.add_route("GET", "/videotube/upload", render_page("upload.html"), True)
-        self.router.add_route("GET", "/videotube/upload/{videoID}", render_page("view-video.html"), True)
+        self.router.add_route("GET", "/videotube/videos", render_page("view-video.html"), False)
         self.router.add_route("GET", "/videotube/set-thumbnail", render_page("set-thumbnail.html"), True)
         #avatar and video
         self.router.add_route("POST", "/api/users/avatar", upload_avatar, True)
