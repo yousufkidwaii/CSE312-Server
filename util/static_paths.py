@@ -16,6 +16,7 @@ MIME_TYPES = {
     ".webp": "image/webp",
     ".ico": "image/x-icon",
     ".mp4": "video/mp4",
+    ".png": "image/png"
 }
 
 def _safe_public_path(url_path: str) -> Optional[Path]:
