@@ -57,12 +57,38 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
 
     def handle(self):
         received_data = self.request.recv(2048)
+        if not received_data:
+            return
+
+        header_end = received_data.find(b"\r\n\r\n")
+        if header_end == -1:
+            return
+
+        headers_part = received_data[:header_end]
+        body_start = header_end + 4
+        body = received_data[body_start:]
+
+        content_length = 0
+        for line in headers_part.split(b"\r\n"):
+            if line.lower().startswith(b"content-length:"):
+                value = line.split(b":", 1)[1].strip()
+                content_length = int(value.decode())
+                break
+
+        while len(body) < content_length:
+            chunk = self.request.recv(2048)
+            if not chunk:
+                break
+            body += chunk
+
+        full_request = headers_part + b"\r\n\r\n" + body
+
         print(self.client_address)
         print("--- received data ---")
-        print(received_data)
+        print(full_request)
         print("--- end of data ---\n\n")
 
-        request = Request(received_data)
+        request = Request(full_request)
 
         self.router.route_request(request, self)
 
