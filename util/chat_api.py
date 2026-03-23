@@ -3,15 +3,51 @@ import uuid
 import html
 import bcrypt
 import hashlib
+from pathlib import Path
+from datetime import datetime
 
 from util.database import db, chat_collection
 from util.response import Response
 from util.request import Request
 from util.auth import extract_credentials, validate_password
+from util.multipart import parse_multipart
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PUBLIC_DIR = PROJECT_ROOT / "public"
+AVATAR_DIR = PUBLIC_DIR / "imgs" / "avatars"
+VIDEO_DIR = PUBLIC_DIR / "videos"
 
 sessions_collection = db["sessions"]
 user_collection = db["users"]
+video_collection = db["videos"]
 
+def ensure_upload_dirs():
+    AVATAR_DIR.mkdir(parents=True, exist_ok=True)
+    VIDEO_DIR.mkdir(parents=True, exist_ok=True)
+
+def default_image():
+    return "/public/imgs/user.webp"
+
+def extract_filename(part):
+    content_disposition = part.headers.get("Content-Disposition", "")
+    lines = content_disposition.split(";")
+    for line in lines:
+        line = line.strip()
+        if line.startswith("filename="):
+            return line[len("filename="):].strip().strip('"')
+    return ""
+
+def get_authed_user(request):
+    token = request.cookies.get("auth_token")
+    if not token:
+        return None
+    hashed_token = hashlib.sha256(token.encoe("utf-8")).digest()
+    return user_collection.find_one({"auth_token": hashed_token})
+
+def get_extension(filename):
+    if "." not in filename:
+        return ""
+    return "." + filename.rsplit(".", 1)[1].lower()
 
 def _get_or_create_session(request):
     if "session" in request.cookies:
@@ -66,9 +102,16 @@ def require_auth(request):
 def create_chat(request, handler):
     body_obj = json.loads(request.body.decode("utf-8"))
     content = html.escape(body_obj.get("content", ""), quote=True)
+
     session_id, author, is_new = _get_or_create_session(request)
     session_doc = sessions_collection.find_one({"_id": session_id}) or {}
     nickname = session_doc.get("nickname")
+
+    user_doc = get_authed_user(request)
+    image_url = default_image()
+    if user_doc and user_doc.get("imageURL"):
+        image_url = user_doc["imageURL"]
+
     msg_id = uuid.uuid4().hex
     chat_collection.insert_one(
         {
@@ -80,6 +123,7 @@ def create_chat(request, handler):
             "deleted": False, # soft delete
             "reactions": {},
             "nickname": nickname if isinstance(nickname, str) else None,
+            "imageURL": image_url,
         }
     )
     # Spec says response must be EXACTLY this string
@@ -93,12 +137,13 @@ def get_chats(request, handler):
     messages = []
     for d in docs:
         msg = {
-                "author": d.get("author", ""),
-                "id": d.get("id", ""),
-                "content": d.get("content", ""),
-                "updated": bool(d.get("updated", False)),
-                "reactions": d.get("reactions", {}) or {},
-            }
+            "author": d.get("author", ""),
+            "id": d.get("id", ""),
+            "content": d.get("content", ""),
+            "updated": bool(d.get("updated", False)),
+            "reactions": d.get("reactions", {}) or {},
+            "imageURL": d.get("imageURL", default_image()),
+        }
         if "nickname" in d and isinstance(d.get("nickname"), str):
             msg["nickname"] = d.get("nickname")
         messages.append(msg)
@@ -428,4 +473,65 @@ def update_users(request,handler):
     )
     res = Response().set_status(200,"OK").text("OK")
     handler.request.sendall(res.to_data())
+
+'''
+==============================================
+    HOMEWORK 3 LOs BEGIN HERE
+===============================================
+'''
+
+
+def upload_avatar(request, handler):
+    user_doc = get_authed_user(request)
+    if not user_doc:
+        res = Response().set_status(401, "Unauthorized").text("Unauthorized")
+        handler.request.sendall(res.to_data())
+        return
+
+    ensure_upload_dirs()
+    multipart_data = parse_multipart(request)
+
+    avatar_part = None
+    for part in multipart_data.parts:
+        if part.name == "avatar"
+            avatar_part = part
+            break
+
+    if avatar_part is None:
+        res = Response().set_status(400, "Bad Request").text("Bad Request")
+        handler.request.sendall(res.to_data())
+        return
+
+    filename = extract_filename(avatar_part)
+    ext = get_extension(filename)
+
+    if ext not in [".jpg", ".jpeg", ".png", ".gif"]:
+        res = Response().set_status(400, "Bad Request").text("Bad Request")
+        handler.request.sendall(res.to_data())
+        return
+
+    old_image_url = "/public/imgs/avatars/" + new_filename
+    new_filename = str(user_doc["_id"]) + ext
+    file_path = AVATAR_DIR / new_filename
+
+    with open(file_path, "wb") as f:
+        f.write(avatar_part.content)
+
+    new_image_url = "/public/imgs/avatars/" + new_filename
+
+    user_collection.update_one(
+        {"_id": user_doc["_id"]},
+        {"$set": {"imageURL": new_image_url}}
+    )
+
+    if old_image_url and old_image_url.startswith("/public/imgs/avatars/") and old_image_url != new_image_url:
+        old_file = PUBLIC_DIR / old_image_url[len("/public/"):]
+        if old_file.exists():
+            try:
+                old_file.unlink()
+            except OSError:
+                pass
+    res = Response().set_status(200, "OK").text("Avatar Uploaded Successfully")
+    handler.request.sendall(res.to_data())
+
 
