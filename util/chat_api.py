@@ -715,7 +715,7 @@ def broadcast_active_users():
             "username": client["username"]
         })
     broadcast_ws_json({
-        "messageType": "active_users_lists",
+        "messageType": "active_users_list",
         "users": users
     })
 
@@ -740,7 +740,7 @@ def remove_ws_client(handler):
 
     new_clients = []
 
-    for clinet in ws_clients:
+    for client in ws_clients:
         if client["handler"] != handler:
             new_clients.append(client)
     ws_clients = new_clients
@@ -750,7 +750,7 @@ def get_framesize(data):
     if len(data) < 2:
         return None
     second_byte = data[1]
-    payload_indicator - second_byte & 127
+    payload_indicator = second_byte & 127
     mask_bit = (second_byte >> 7) & 1
 
     i = 2
@@ -846,7 +846,7 @@ def handle_websocket(request, handler):
         user = user_collection.find_one({"auth_token": hashed_token})
         if user is not None:
             username = user.get("username")
-    if upgrade_header is None or upgrade_header.lower() != "websocket" or ws_key is None or user is None:
+    if upgrade_header is None or upgrade_header.lower() != "websocket" or ws_key is None or username is None:
         res = Response().set_status(403, "Forbidden").text("Forbidden")
         handler.request.sendall(res.to_data())
         return
