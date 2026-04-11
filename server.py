@@ -7,7 +7,7 @@ from util.chat_api import (create_chat, get_chats, update_chat, delete_chat,
                            add_reaction, remove_reaction,
                            update_nickname,
                            user_registration, user_login, user_logout, get_me, search_users, update_users,
-                           upload_avatar, upload_video, get_videos, get_single_video)
+                           upload_avatar, upload_video, get_videos, get_single_video, handle_websocket)
 
 
 class MyTCPHandler(socketserver.BaseRequestHandler):
@@ -53,6 +53,12 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
         self.router.add_route("POST", "/api/videos", upload_video, True)
         self.router.add_route("GET", "/api/videos", get_videos, True)
         self.router.add_route("GET", "/api/videos/", get_single_video, False)
+        #hw4
+        self.router.add_route("GET", "/test-websocket", render_page("test-websocket.html"),True)
+        self.router.add_route("GET", "/drawing-board", render_page("drawing-board.html"), True)
+        self.router.add_route("GET", "/video-call", render_page("video-call.html"), True)
+        self.router.add_route("GET", "/video-call/", render_page("video-call-room.html"), False)
+        self.router.add_route("GET", "/websocket", handle_websocket, True)
         super().__init__(request, client_address, server)
 
     def handle(self):

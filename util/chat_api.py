@@ -12,10 +12,13 @@ from util.response import Response
 from util.request import Request
 from util.auth import extract_credentials, validate_password
 from util.multipart import parse_multipart
+from util.websockets import compute_accept, parse_ws_frame, generate_ws_frame
 
 sessions_collection = db["sessions"]
 user_collection = db["users"]
 video_collection = db["videos"]
+strokes_collection = db["strokes"]
+ws_clients = []
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 PUBLIC_DIR = PROJECT_ROOT / "public"
@@ -683,3 +686,192 @@ def get_single_video(request, handler):
 
     res = Response().set_status(200, "OK").json({"video": video})
     handler.request.sendall(res.to_data())
+
+def send_ws_json(handler, data):
+    payload_bytes = json.dumps(data).encode()
+    frame = generate_ws_frame(payload_bytes)
+    handler.request.sendall(frame)
+
+def broadcast_ws_json(data):
+    global ws_clients
+
+    payload_bytes = json.dumps(data).encode()
+    frame = generate_ws_frame(payload_bytes)
+
+    remaining_clients = []
+
+    for client in ws_clients:
+        try:
+            client["handler"].request.sendall(frame)
+            remaining_clients.append(client)
+        except:
+            pass
+    ws_clients = remaining_clients
+
+def broadcast_active_users():
+    users = []
+    for client in ws_clients:
+        users.append({
+            "username": client["username"]
+        })
+    broadcast_ws_json({
+        "messageType": "active_users_lists",
+        "users": users
+    })
+
+def send_strokes(handler):
+    strokes = []
+
+    for doc in strokes_collection.find({}, {"_id": 0}):
+        strokes.append({
+            "startX": doc.get("startX"),
+            "startY": doc.get("startY"),
+            "endX": doc.get("endX"),
+            "endY": doc.get("endY"),
+            "color": doc.get("color")
+        })
+    send_ws_json(handler, {
+        "messageType": "init_strokes",
+        "strokes": strokes
+    })
+
+def remove_ws_client(handler):
+    global ws_clients
+
+    new_clients = []
+
+    for clinet in ws_clients:
+        if client["handler"] != handler:
+            new_clients.append(client)
+    ws_clients = new_clients
+    broadcast_active_users()
+
+def get_framesize(data):
+    if len(data) < 2:
+        return None
+    second_byte = data[1]
+    payload_indicator - second_byte & 127
+    mask_bit = (second_byte >> 7) & 1
+
+    i = 2
+
+    if payload_indicator <= 125:
+        payload_len = payload_indicator
+    elif payload_indicator == 126:
+        if len(data) < 4:
+            return None
+        payload_len = int.from_bytes(data[2:4], "big")
+        i = 4
+    else:
+        if len(data) < 10:
+            return None
+        payload_len = int.from_bytes(data[2:10], "big")
+        i = 10
+    if mask_bit == 1:
+        i += 4
+
+    return i + payload_len
+
+def handle_ws_msg(handler, message):
+    msg_type = message.get("messageType")
+    if msg_type == "echo_client":
+        send_ws_json(handler, {
+            "messageType": "echo_server",
+            "text": message.get("text", "")
+        })
+    elif msg_type == "drawing":
+        stroke = {
+            "startX": message.get("startX"),
+            "startY": message.get("startY"),
+            "endX": message.get("endX"),
+            "endY": message.get("endY"),
+            "color": message.get("color"),
+        }
+
+        strokes_collection.insert_one(stroke)
+
+        broadcast_ws_json({
+            "messageType": "drawing",
+            "startX": stroke["startX"],
+            "startY": stroke["startY"],
+            "endX": stroke["endX"],
+            "endY": stroke["endY"],
+            "color": stroke["color"]
+        })
+def websocket_loop(handler):
+    buffer = b""
+
+    while True:
+        chunk = handler.request.recv(2048)
+        if not chunk:
+            break
+        buffer += chunk
+        while True:
+            frame_size = get_framesize(buffer)
+            if frame_size is None:
+                break
+            if len(buffer) < frame_size:
+                break
+            frame_bytes = buffer[:frame_size]
+            buffer = buffer[frame_size:]
+
+            frame = parse_ws_frame(frame_bytes)
+            if frame.opcode == 8:
+                return
+            if frame.opcode != 1:
+                continue
+            try:
+                message = json.loads(frame.payload.decode())
+            except:
+                continue
+            handle_ws_msg(handler,message)
+
+def handle_websocket(request, handler):
+    global ws_clients
+
+    upgrade_header = None
+    for key in request.headers:
+        if key.lower() == "upgrade":
+            upgrade_header = request.headers[key]
+
+    ws_key = None
+    for key in request.headers:
+        if key.lower() == "sec-websocket-key":
+            ws_key = request.headers[key]
+    username = None
+    token = request.cookies.get("auth_token")
+
+    if token is not None:
+        hashed_token = hashlib.sha256(token.encode()).digest()
+        user = user_collection.find_one({"auth_token": hashed_token})
+        if user is not None:
+            username = user.get("username")
+    if upgrade_header is None or upgrade_header.lower() != "websocket" or ws_key is None or user is None:
+        res = Response().set_status(403, "Forbidden").text("Forbidden")
+        handler.request.sendall(res.to_data())
+        return
+
+    accept_value = compute_accept(ws_key)
+    handshake_res = (
+        "HTTP/1.1 101 Switching Protocols\r\n"
+        "Upgrade: websocket\r\n"
+        "Connection: Upgrade\r\n"
+        "Sec-WebSocket-Accept: " + accept_value + "\r\n"
+        "\r\n"
+    ).encode()
+
+    handler.request.sendall(handshake_res)
+    ws_clients.append({
+        "handler": handler,
+        "username": username
+    })
+
+    send_strokes(handler)
+    broadcast_active_users()
+
+    try:
+        websocket_loop(handler)
+    finally:
+        remove_ws_client(handler)
+
+
