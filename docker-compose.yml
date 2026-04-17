@@ -1,4 +1,10 @@
 services:
+  nginx:
+    build:
+      dockerfile: ./nginx
+    ports:
+      - '443:443'
+      - '80:80'
   mongo:
     image: mongo:4.2.5
   myapp:
