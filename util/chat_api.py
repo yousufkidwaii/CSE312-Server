@@ -405,6 +405,7 @@ def user_login(request, handler):
     res.cookies({
         "auth_token": auth_token,
         "HttpOnly": True,
+        "Secure": True,
         "Max-Age": 30 * 24 * 60 * 60,
     })
     handler.request.sendall(res.to_data())
@@ -798,9 +799,22 @@ def handle_ws_msg(handler, message):
             "endY": stroke["endY"],
             "color": stroke["color"]
         })
+def process_complete_ws_message(handler, opcode, payload):
+    if opcode != 1:
+        return
+
+    try:
+        message = json.loads(payload.decode())
+    except:
+        return
+
+    handle_ws_msg(handler, message)
+
+
 def websocket_loop(handler):
     buffer = b""
-
+    fragmented_opcode = None
+    fragmented_payload = b""
     while True:
         chunk = handler.request.recv(2048)
         if not chunk:
@@ -814,17 +828,28 @@ def websocket_loop(handler):
                 break
             frame_bytes = buffer[:frame_size]
             buffer = buffer[frame_size:]
-
             frame = parse_ws_frame(frame_bytes)
             if frame.opcode == 8:
                 return
-            if frame.opcode != 1:
+            if frame.opcode == 1:
+                if frame.fin_bit == 1:
+                    process_complete_ws_message(handler, frame.opcode, frame.payload)
+                else:
+                    fragmented_opcode = frame.opcode
+                    fragmented_payload = frame.payload
                 continue
-            try:
-                message = json.loads(frame.payload.decode())
-            except:
+            if frame.opcode == 0:
+                if fragmented_opcode is None:
+                    continue
+                fragmented_payload += frame.payload
+                if frame.fin_bit == 1:
+                    process_complete_ws_message(handler, fragmented_opcode, fragmented_payload)
+                    fragmented_opcode = None
+                    fragmented_payload = b""
                 continue
-            handle_ws_msg(handler,message)
+
+            if frame.opcode == 9:
+                continue
 
 def handle_websocket(request, handler):
     global ws_clients
